@@ -1,0 +1,123 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  body {
+    @apply bg-p-bg text-white font-sans antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-p-panel backdrop-blur-glass border border-p-border rounded-2xl shadow-glass;
+  }
+
+  .glass-input {
+    @apply bg-black/30 border border-p-border text-white px-3 py-2.5 rounded-lg
+           font-sans text-sm outline-none transition-colors
+           focus:border-p-lime placeholder:text-p-muted;
+  }
+
+  .glass-select {
+    @apply bg-black/20 border border-p-border text-white px-3 py-2 rounded-lg
+           text-sm outline-none focus:border-p-lime;
+  }
+
+  .btn-primary {
+    @apply bg-p-lime text-p-bg border-none px-5 h-11 rounded-full
+           font-bold text-sm flex items-center gap-2 cursor-pointer
+           transition-all shadow-glow
+           hover:bg-p-lime-light hover:-translate-y-0.5;
+  }
+
+  .btn-icon {
+    @apply w-11 h-11 rounded-full border border-p-border bg-p-panel text-white
+           cursor-pointer flex items-center justify-center relative transition-all
+           hover:bg-white/10;
+  }
+
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-3 text-p-gray-light text-sm font-medium
+           rounded-xl cursor-pointer transition-all duration-300
+           hover:bg-white/5 hover:text-white;
+  }
+
+  .nav-item-active {
+    @apply text-p-lime bg-gradient-to-r from-p-lime/15 to-transparent
+           border-l-[3px] border-p-lime;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 px-2 py-1 rounded-xl text-xs font-semibold;
+  }
+  .badge-red {
+    @apply bg-p-red/15 text-p-red border border-p-red/30;
+  }
+  .badge-green {
+    @apply bg-p-lime/15 text-p-lime border border-p-lime/30;
+  }
+  .badge-yellow {
+    @apply bg-p-yellow/15 text-p-yellow border border-p-yellow/30;
+  }
+  .badge-blue {
+    @apply bg-p-blue/15 text-p-blue border border-p-blue/30;
+  }
+
+  .data-table {
+    @apply w-full;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+  }
+  .data-table th {
+    @apply px-4 py-4 text-left text-xs uppercase text-p-muted font-bold
+           border-b border-p-border bg-[#1e2028];
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .data-table td {
+    @apply px-4 py-4 text-sm border-b border-p-border;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .data-table tbody tr {
+    @apply transition-colors hover:bg-p-lime/5;
+  }
+
+  .metric-card {
+    @apply glass-panel p-5 transition-transform duration-300 hover:-translate-y-1;
+  }
+  .metric-card-alert {
+    @apply border-p-red/30 shadow-glow-red;
+  }
+
+  .sub-tab {
+    @apply bg-transparent border-none text-p-gray-light text-[15px] font-medium
+           px-5 py-3 cursor-pointer border-b-2 border-transparent transition-all
+           hover:text-white;
+  }
+  .sub-tab-active {
+    @apply text-p-lime border-b-p-lime;
+  }
+}

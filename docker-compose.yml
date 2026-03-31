@@ -1,0 +1,8 @@
+services:
+  client:
+    build: .
+    container_name: prisier-client
+    ports:
+      - "3002:80"
+    environment:
+      - NODE_ENV=production
