@@ -41,7 +41,7 @@ export default function ClientLayout() {
         {/* Logo */}
         <div className="flex flex-col items-start gap-1 mb-10">
           <img
-            src="/logo.jpg"
+            src={`${import.meta.env.BASE_URL}logo.jpg`}
             alt="Prisier"
             className="h-[44px] object-contain bg-white px-2.5 py-1 rounded-lg"
           />

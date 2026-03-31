@@ -34,7 +34,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-p-bg flex items-center justify-center">
       <div className="glass-panel p-10 w-full max-w-md">
         <div className="text-center mb-10">
-          <img src="/logo.jpg" alt="Prisier" className="h-12 mx-auto mb-3" />
+          <img src={`${import.meta.env.BASE_URL}logo.jpg`} alt="Prisier" className="h-12 mx-auto mb-3" />
           <p className="text-p-muted text-sm">Portal Cliente</p>
         </div>
 
