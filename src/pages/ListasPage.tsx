@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { FileSpreadsheet, FileText } from 'lucide-react'
+import { FileSpreadsheet, FileText, AlertTriangle } from 'lucide-react'
 import api from '../lib/api'
 import type { ListaSkuRow } from '../lib/types'
 import SearchInput from '../components/SearchInput'
@@ -159,6 +159,16 @@ export default function ListasPage() {
         </div>
       </div>
 
+      {/* Empty channels banner — solo cuando canalesConfig ya cargó y vino vacío */}
+      {canalesConfig && canales.length === 0 && (
+        <div className="flex items-center gap-3 bg-yellow-900/30 border border-yellow-600/40 rounded-lg px-4 py-3 mb-6">
+          <AlertTriangle className="w-5 h-5 text-yellow-400 shrink-0" />
+          <p className="text-sm text-yellow-200">
+            <span className="font-semibold">Canales no configurados</span> — Contacte a su consultor Prisier para configurar los canales y márgenes de su lista de precios.
+          </p>
+        </div>
+      )}
+
       {/* Loading / Error */}
       {isLoading ? (
         <div className="glass-panel overflow-x-auto">
@@ -183,9 +193,14 @@ export default function ListasPage() {
                   <th>Producto</th>
                   <th className="text-right" style={{ color: '#a3e635' }}>Precio sugerido</th>
                   <th className="text-right">Precio sin IVA</th>
-                  {canales.map(c => (
-                    <th key={c.nombre} className="text-right">{c.nombre}</th>
-                  ))}
+                  {canales.map(c => {
+                    const margenes = Object.values(c.margenes)
+                    const uniforme = margenes.length > 0 && margenes.every(m => m === margenes[0])
+                    const label = uniforme
+                      ? `${c.nombre} (-${(margenes[0] * 100).toFixed(0)}%)`
+                      : c.nombre
+                    return <th key={c.nombre} className="text-right">{label}</th>
+                  })}
                   <th className="w-8" />
                 </tr>
               </thead>

@@ -172,7 +172,7 @@ function DashboardTab({ filters }: { filters: string }) {
           subColor={Math.abs(desviacionDiff) <= 5 ? 'text-p-lime' : 'text-p-red'}
         />
         <KpiCard
-          label="SKUs Monitoreados"
+          label="Total SKUs Monitoreados"
           value={String(kpis?.totalSkus ?? 0)}
           icon={Box}
           color="text-p-blue"
@@ -189,7 +189,7 @@ function DashboardTab({ filters }: { filters: string }) {
           alert={!!kpis?.skusCriticos}
         />
         <KpiCard
-          label="Retailer más alejado del precio sugerido"
+          label="Retailer con Mayor Desviación"
           value={kpis?.retailerMayorDesviacion?.retailer ?? '—'}
           icon={Store}
           color="text-p-blue"
@@ -376,6 +376,7 @@ function MarcaDrawerContent({ marca, filters }: { marca: BrandExecution; filters
           <th className="text-right py-2 px-3">Observado</th>
           <th className="text-right py-2 px-3">Desviación</th>
           <th className="text-left py-2 px-3">Retailer</th>
+          <th className="text-left py-2 px-3">Fecha</th>
         </tr>
       </thead>
       <tbody>
@@ -389,10 +390,11 @@ function MarcaDrawerContent({ marca, filters }: { marca: BrandExecution; filters
             <td className="py-2 px-3 text-right text-p-muted text-xs">{fmtCOP(r.precioObservado)}</td>
             <td className="py-2 px-3 text-right"><SeverityBadge value={r.desviacionPct - 100} /></td>
             <td className="py-2 px-3 text-p-muted text-xs">{r.retailer}</td>
+            <td className="py-2 px-3 text-p-muted text-xs">{r.fechaScraping}</td>
           </tr>
         ))}
         {rows.length === 0 && (
-          <tr><td colSpan={5} className="text-center py-8 text-p-muted text-sm">Sin datos para esta marca</td></tr>
+          <tr><td colSpan={6} className="text-center py-8 text-p-muted text-sm">Sin datos para esta marca</td></tr>
         )}
       </tbody>
     </table>
@@ -478,10 +480,14 @@ function DetalleTab({ filters }: { filters: string }) {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="data-table" style={{ minWidth: `${400 + retailers.length * 180}px` }}>
+            <table className="data-table" style={{ minWidth: `${620 + retailers.length * 180}px` }}>
               <thead>
                 <tr>
-                  <th rowSpan={2} style={{ width: 220 }}>Producto</th>
+                  <th rowSpan={2} style={{ width: 100 }}>SKU</th>
+                  <th rowSpan={2} style={{ width: 200 }}>Producto</th>
+                  <th rowSpan={2} style={{ width: 110 }}>Marca</th>
+                  <th rowSpan={2} style={{ width: 110 }}>Categoría</th>
+                  <th rowSpan={2} style={{ width: 110 }} className="text-right">PVP Sugerido</th>
                   {retailers.map(ret => (
                     <th key={ret} colSpan={2} className="text-center border-l border-p-border/30" style={{ width: 180 }}>
                       {ret}
@@ -504,10 +510,11 @@ function DetalleTab({ filters }: { filters: string }) {
               <tbody>
                 {pivotRows.map(row => (
                   <tr key={row.skuId}>
-                    <td>
-                      <div className="font-medium text-white text-sm truncate max-w-[200px]" title={row.nombre}>{row.nombre}</div>
-                      <div className="text-p-muted text-xs">{row.marca}</div>
-                    </td>
+                    <td className="font-mono text-p-muted text-xs" title={row.codigoSku}>{row.codigoSku}</td>
+                    <td className="font-medium text-white text-sm truncate max-w-[200px]" title={row.nombre}>{row.nombre}</td>
+                    <td className="text-p-gray-light text-xs" title={row.marca}>{row.marca}</td>
+                    <td className="text-p-gray-light text-xs" title={row.categoria}>{row.categoria}</td>
+                    <td className="text-right text-p-lime font-semibold text-xs">{fmtCOP(row.pvpSugerido)}</td>
                     {retailers.map(ret => {
                       const cell = row.retailers[ret]
                       return (
@@ -528,7 +535,7 @@ function DetalleTab({ filters }: { filters: string }) {
                 ))}
                 {pivotRows.length === 0 && (
                   <tr>
-                    <td colSpan={1 + retailers.length * 2} className="text-center py-12 text-p-muted">
+                    <td colSpan={5 + retailers.length * 2} className="text-center py-12 text-p-muted">
                       Aún no hay datos de precios para este periodo
                     </td>
                   </tr>

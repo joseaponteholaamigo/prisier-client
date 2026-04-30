@@ -11,16 +11,25 @@ import {
   type Sku,
   type PrecioMercado,
 } from './data'
+import type { EstadoCarga, TipoCargaCliente } from '../lib/types'
 
 export interface CargaHistorialRow {
   id: string
-  tipoArchivo: string
+  tipoArchivo: TipoCargaCliente
   nombreArchivo: string
-  estado: string
+  estado: EstadoCarga
   registrosProcesados: number
   totalErrores: number
   subidoPor: string
   fechaCarga: string
+}
+
+export interface PreviewEntry {
+  previewId: string
+  tipo: TipoCargaCliente
+  nombre: string
+  estado: EstadoCarga
+  resumen: { nuevas: number; actualizadas: number; omitidas: number }
 }
 
 export interface ListaPrecioEditado {
@@ -38,6 +47,8 @@ export const store = {
   canalesMargenesConfig: structuredClone(SEED_CANALES_MARGENES),
   reglas: structuredClone(SEED_REGLAS),
   cargasHistorial: [] as CargaHistorialRow[],
-  preciosEditados: {} as Record<string, number>, // skuId → pvpEditado
+  previews: {} as Record<string, PreviewEntry>,
+  preciosEditados: {} as Record<string, number>,
   _uploadCounter: 0,
+  _previewCounter: 0,
 }

@@ -316,6 +316,27 @@ function handleCompetition(path: string, params: URLSearchParams) {
   return null
 }
 
+import * as XLSX from 'xlsx'
+
+// ─── Helper compartido: precio óptimo (módulo 3a) ────────────────────────────
+type SkuLike = (typeof store.skus)[number]
+type PrecioObs = (typeof store.preciosMercado)[number]
+
+function computePrecioOptimo(sku: SkuLike, precios: PrecioObs[]) {
+  const atribs = store.categoriaAtributos.filter(a => a.categoria === sku.categoria)
+  const vp = atribs.reduce((acc, a) => acc + a.peso * a.calificacion, 0)
+  const precioActual = avg(precios.filter(p => p.skuId === sku.id).map(p => p.precioObservado)) || sku.pvpSugerido
+  const vpMax = 5
+  const factor = 0.85 + (vp / vpMax) * 0.30
+  const precioOptimo = Math.round(sku.costoVariable / (1 - 0.35) * factor)
+  const variacion = precioActual ? round2((precioOptimo - precioActual) / precioActual * 100) : 0
+  const recomendacion = variacion > 3 ? 'aumentar' : variacion < -3 ? 'reducir' : 'mantener'
+  const tieneCompetidores = store.competidores.some(c => c.skuId === sku.id)
+  const skuHash = sku.id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+  const precioOptimoValido = tieneCompetidores && skuHash % 10 !== 0
+  return { precioActual, precioOptimo, variacion, recomendacion, tieneCompetidores, precioOptimoValido }
+}
+
 // ─── Pricing ──────────────────────────────────────────────────────────────────
 function handlePricing(path: string, params: URLSearchParams) {
   const subpath = path.replace('pricing/', '')
@@ -338,17 +359,8 @@ function handlePricing(path: string, params: URLSearchParams) {
 
   if (subpath === 'portfolio') {
     return ok(skus.map(sku => {
-      const atribs = store.categoriaAtributos.filter(a => a.categoria === sku.categoria)
-      const vp = atribs.reduce((acc, a) => acc + a.peso * a.calificacion, 0)
-      const precioActual = avg(precios.filter(p => p.skuId === sku.id).map(p => p.precioObservado)) || sku.pvpSugerido
-      // precio óptimo: pvp ajustado por VP relativo al promedio de categoría (simple heurística)
-      const vpMax = 5 // máximo teórico VP (todos peso×5)
-      const factor = 0.85 + (vp / vpMax) * 0.30
-      const precioOptimo = Math.round(sku.costoVariable / (1 - 0.35) * factor)
-      const variacion = precioActual ? round2((precioOptimo - precioActual) / precioActual * 100) : 0
-      const recomendacion = variacion > 3 ? 'aumentar' : variacion < -3 ? 'reducir' : 'mantener'
-      const tieneCompetidores = store.competidores.some(c => c.skuId === sku.id)
-      return { skuId: sku.id, codigoSku: sku.codigoSku, nombre: sku.nombre, marca: sku.marca, categoria: sku.categoria, precioActual: round2(precioActual), precioOptimo, variacionPct: variacion, recomendacion, tieneCompetidores }
+      const r = computePrecioOptimo(sku, precios)
+      return { skuId: sku.id, codigoSku: sku.codigoSku, nombre: sku.nombre, marca: sku.marca, categoria: sku.categoria, precioActual: round2(r.precioActual), precioOptimo: r.precioOptimo, variacionPct: r.variacion, recomendacion: r.recomendacion, tieneCompetidores: r.tieneCompetidores, precioOptimoValido: r.precioOptimoValido }
     }))
   }
 
@@ -387,6 +399,10 @@ function handlePricing(path: string, params: URLSearchParams) {
     const xMax = Math.max(...puntos.map(p => p.valorPercibido)) + 0.2
     const precioOptimoValor = round2(slope * vpCliente + intercept)
 
+    // Sincronizar el flag con la lógica de portfolio para que la tabla y el mapa coincidan
+    const skuHash = sku.id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+    const precioOptimoValido = slope > 0 && skuHash % 10 !== 0
+
     return ok({
       producto: { nombre: sku.nombre, valorPercibido: vpCliente, precio: round2(precioActual), tipo: 'cliente' },
       precioOptimoPunto: precioOptimoValor,
@@ -395,6 +411,7 @@ function handlePricing(path: string, params: URLSearchParams) {
       precioOptimoValor,
       variacionPct: precioActual ? round2((precioOptimoValor - precioActual) / precioActual * 100) : 0,
       recomendacion: precioOptimoValor > precioActual * 1.03 ? 'aumentar' : precioOptimoValor < precioActual * 0.97 ? 'reducir' : 'mantener',
+      precioOptimoValido,
     })
   }
 
@@ -441,18 +458,24 @@ function handleElasticidad(path: string, params: URLSearchParams) {
   if (subpath === 'summary') {
     return ok(elasticidades.map(e => {
       const sku = store.skus.find(s => s.id === e.skuId)!
-      const precioActual = avg(precios.filter(p => p.skuId === sku.id).map(p => p.precioObservado)) || sku.pvpSugerido
-      const cambio = 0.1 // 10% simulado
+      const opt = computePrecioOptimo(sku, precios)
+      const precioActual = opt.precioActual
+      const precioRec = opt.precioOptimoValido ? opt.precioOptimo : precioActual
+      const cambio = precioActual ? (precioRec - precioActual) / precioActual : 0
       const impactoVolumen = round2(e.coeficiente * cambio * 100)
       const nuevoVolumen = e.volumenBase * (1 + e.coeficiente * cambio)
-      const impactoIngresos = round2(((nuevoVolumen * precioActual * (1 + cambio)) - (e.volumenBase * precioActual)) / (e.volumenBase * precioActual) * 100)
+      const impactoIngresos = round2(((nuevoVolumen * precioRec) - (e.volumenBase * precioActual)) / (e.volumenBase * precioActual) * 100)
       const margen = precioActual - sku.costoVariable
-      const impactoMargen = round2(((nuevoVolumen * margen * (1 + cambio)) - (e.volumenBase * margen)) / (e.volumenBase * margen) * 100)
+      const margenNuevo = precioRec - sku.costoVariable
+      const impactoMargen = margen !== 0
+        ? round2(((nuevoVolumen * margenNuevo) - (e.volumenBase * margen)) / (e.volumenBase * margen) * 100)
+        : 0
       return {
         skuId: sku.id, codigoSku: sku.codigoSku, nombre: sku.nombre, marca: sku.marca,
         volumenBase: e.volumenBase,
         coeficiente: round2(e.coeficiente),
         precioActual: round2(precioActual),
+        precioRecomendado: round2(precioRec),
         costoVariable: sku.costoVariable,
         impactoVolumenPct: impactoVolumen,
         impactoIngresosPct: impactoIngresos,
@@ -460,6 +483,26 @@ function handleElasticidad(path: string, params: URLSearchParams) {
         nivelConfianza: round2(e.confianza),
       }
     }))
+  }
+
+  if (subpath.startsWith('sku/')) {
+    const skuId = subpath.replace('sku/', '')
+    const e = store.elasticidades.find(e => e.skuId === skuId)
+    const sku = store.skus.find(s => s.id === skuId)
+    if (!e || !sku) return Promise.reject({ response: { status: 404 } })
+    const opt = computePrecioOptimo(sku, precios)
+    const precioRec = opt.precioOptimoValido ? opt.precioOptimo : opt.precioActual
+    return ok({
+      skuId: sku.id,
+      codigoSku: sku.codigoSku,
+      nombre: sku.nombre,
+      precioActual: round2(opt.precioActual),
+      precioRecomendado: round2(precioRec),
+      costoVariable: sku.costoVariable,
+      volumenBase: e.volumenBase,
+      coeficiente: round2(e.coeficiente),
+      confianza: round2(e.confianza),
+    })
   }
 
   return null
@@ -500,34 +543,157 @@ function handleListas(path: string, params: URLSearchParams) {
     })
   }
 
+  if (subpath === 'canales') {
+    const categorias = [...new Set(store.skus.map(s => s.categoria))]
+    const buildMargenes = (m: number) => Object.fromEntries(categorias.map(c => [c, m]))
+    return ok({
+      iva: 0.19,
+      canales: [
+        { nombre: 'Lista Mayorista', margenes: buildMargenes(0.20) },
+        { nombre: 'Lista Retail',    margenes: buildMargenes(0.35) },
+        { nombre: 'Lista TAT',       margenes: buildMargenes(0.15) },
+      ],
+    })
+  }
+
   return null
 }
 
+// Export Excel/CSV de Listas — implementaciones simples para mock
+function handleListasExport(method: string, path: string, body: unknown): Promise<{ data: Blob; headers: Record<string, string> }> | null {
+  if (method !== 'POST') return null
+  if (path !== 'listas/export/excel' && path !== 'listas/export/csv') return null
+
+  const { items } = body as { items: Array<{ skuId: string; pvpEditado: number }> }
+  const editsMap = new Map(items.map(i => [i.skuId, i.pvpEditado]))
+  const iva = 0.19
+  const canales = [
+    { nombre: 'Lista Mayorista', margen: 0.20 },
+    { nombre: 'Lista Retail',    margen: 0.35 },
+    { nombre: 'Lista TAT',       margen: 0.15 },
+  ]
+
+  const rows = store.skus.map(sku => {
+    const pvp = editsMap.get(sku.id) ?? sku.pvpSugerido
+    const sinIva = pvp / (1 + iva)
+    const row: Record<string, unknown> = {
+      'Código': sku.codigoSku,
+      'Producto': sku.nombre,
+      'Marca': sku.marca,
+      'Categoría': sku.categoria,
+      'PVP': Math.round(pvp),
+      'PVP sin IVA': Math.round(sinIva),
+    }
+    for (const c of canales) {
+      row[`${c.nombre} (-${(c.margen * 100).toFixed(0)}%)`] = Math.round(sinIva * (1 - c.margen))
+    }
+    return row
+  })
+
+  if (path === 'listas/export/excel') {
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Listas de precios')
+    const arrayBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer
+    const blob = new Blob([arrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    return Promise.resolve({ data: blob, headers: {} })
+  }
+
+  // CSV
+  const headers = Object.keys(rows[0] ?? { Código: '' })
+  const lines = [headers.join(',')]
+  for (const r of rows) {
+    lines.push(headers.map(h => {
+      const v = r[h]
+      const s = typeof v === 'string' ? `"${v.replace(/"/g, '""')}"` : String(v ?? '')
+      return s
+    }).join(','))
+  }
+  const csv = lines.join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  return Promise.resolve({ data: blob, headers: {} })
+}
+
 // ─── Ingesta ──────────────────────────────────────────────────────────────────
-function handleIngesta(path: string, body: unknown) {
+function handleIngesta(method: string, path: string, body: unknown) {
   const subpath = path.replace('ingesta/', '')
 
-  if (subpath === 'historial') {
+  // GET /ingesta/historial
+  if (method === 'GET' && subpath === 'historial') {
     return ok(store.cargasHistorial)
   }
 
-  if (subpath === 'upload/skus' || subpath === 'upload/competidores') {
-    const tipo = subpath === 'upload/skus' ? 'skus' : 'competidores'
+  // POST /ingesta/preview/{tipo}  → dry-run con 2 errores de ejemplo
+  if (method === 'POST' && (subpath === 'preview/portafolio' || subpath === 'preview/competidores')) {
+    const tipo = subpath.replace('preview/', '') as 'portafolio' | 'competidores'
     const nombre = (body as FormData)?.get?.('file') instanceof File
       ? ((body as FormData).get('file') as File).name
       : 'archivo.xlsx'
+    store._previewCounter++
+    const previewId = `prev-${store._previewCounter}`
+    const resumen = { nuevas: 45, actualizadas: 12, omitidas: 2 }
+    store.previews[previewId] = {
+      previewId,
+      tipo,
+      nombre: typeof nombre === 'string' ? nombre : 'archivo.xlsx',
+      estado: 'procesando',
+      resumen,
+    }
+    return ok({
+      previewId,
+      resumen,
+      errores: [
+        { fila: 3, columna: tipo === 'portafolio' ? 'EAN' : 'EAN Propio', mensaje: 'Valor vacío o inválido' },
+        { fila: 17, columna: tipo === 'portafolio' ? 'PVP Sugerido' : 'Retailer', mensaje: 'El valor debe ser numérico' },
+      ],
+    })
+  }
+
+  // POST /ingesta/confirmar/{previewId}  → crea entrada en historial como 'procesando'
+  if (method === 'POST' && subpath.startsWith('confirmar/')) {
+    const previewId = subpath.replace('confirmar/', '')
+    const entry = store.previews[previewId]
+    if (!entry) {
+      return Promise.reject({ response: { status: 410, data: { error: 'Preview no encontrado o expirado.' } } })
+    }
     store._uploadCounter++
+    const histId = `carga-${store._uploadCounter}`
     store.cargasHistorial.unshift({
-      id: `upload-${store._uploadCounter}`,
-      tipoArchivo: tipo,
-      nombreArchivo: typeof nombre === 'string' ? nombre : 'archivo.xlsx',
-      estado: 'completado',
-      registrosProcesados: 90,
-      totalErrores: 0,
+      id: histId,
+      tipoArchivo: entry.tipo,
+      nombreArchivo: entry.nombre,
+      estado: 'procesando',
+      filasNuevas: 0,
+      filasActualizadas: 0,
+      totalErrores: entry.resumen.omitidas,
       subidoPor: 'Cliente ConGrupo',
       fechaCarga: new Date().toISOString(),
     })
-    return ok({ totalProcesados: 90, totalErrores: 0, errores: [] })
+    // Transitar a estado terminal tras 2.5s
+    setTimeout(() => {
+      const row = store.cargasHistorial.find(r => r.id === histId)
+      if (row) {
+        row.estado = entry.resumen.omitidas > 0 ? 'con_advertencias' : 'exitoso'
+        row.filasNuevas = entry.resumen.nuevas
+        row.filasActualizadas = entry.resumen.actualizadas
+      }
+      entry.estado = row?.estado ?? 'exitoso'
+    }, 2500)
+    return ok({ histId })
+  }
+
+  // GET /ingesta/preview/{previewId}/estado  → estado terminal para polling del modal
+  if (method === 'GET' && subpath.startsWith('preview/') && subpath.endsWith('/estado')) {
+    const previewId = subpath.replace('preview/', '').replace('/estado', '')
+    const entry = store.previews[previewId]
+    return ok({ estado: entry?.estado ?? 'exitoso' })
+  }
+
+  // DELETE /ingesta/preview/{previewId}  → cancelar preview
+  if (method === 'DELETE' && subpath.startsWith('preview/')) {
+    const previewId = subpath.replace('preview/', '')
+    delete store.previews[previewId]
+    return ok({ ok: true })
   }
 
   return null
@@ -616,6 +782,12 @@ function route<T>(method: string, rawUrl: string, body?: unknown): Promise<{ dat
     if (r) return r as Promise<{ data: T }>
   }
 
+  // Listas — export Excel/CSV (POST)
+  if (path === 'listas/export/excel' || path === 'listas/export/csv') {
+    const r = handleListasExport(method, path, body)
+    if (r) return r as Promise<{ data: T }>
+  }
+
   // Listas
   if (path.startsWith('listas/') || path === 'listas/filters') {
     const r = handleListas(path, params)
@@ -624,7 +796,7 @@ function route<T>(method: string, rawUrl: string, body?: unknown): Promise<{ dat
 
   // Ingesta
   if (path.startsWith('ingesta/')) {
-    const r = handleIngesta(path, body)
+    const r = handleIngesta(method, path, body)
     if (r) return r as Promise<{ data: T }>
   }
 

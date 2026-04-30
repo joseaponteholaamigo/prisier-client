@@ -104,7 +104,7 @@ export interface ElasticidadSummaryRow {
   volumenBase: number
   coeficiente: number
   precioActual: number
-  precioRecomendado?: number
+  precioRecomendado: number
   costoVariable: number
   impactoVolumenPct: number
   impactoIngresosPct: number
@@ -117,6 +117,7 @@ export interface SkuElasticidadDetail {
   codigoSku: string
   nombre: string
   precioActual: number
+  precioRecomendado: number
   costoVariable: number
   volumenBase: number
   coeficiente: number
@@ -136,6 +137,7 @@ export interface PortfolioRow {
   variacionPct: number
   recomendacion: string
   tieneCompetidores: boolean
+  precioOptimoValido: boolean
 }
 
 export interface ValueMapData {
@@ -146,6 +148,7 @@ export interface ValueMapData {
   precioOptimoValor: number
   variacionPct: number
   recomendacion: string
+  precioOptimoValido: boolean
 }
 
 export interface ValueMapPoint {
@@ -197,24 +200,32 @@ export interface PivotResponse {
 
 // Ingesta de Datos
 
-export interface CargaResult {
-  totalProcesados: number
-  totalErrores: number
-  errores: CargaError[]
+export type EstadoCarga = 'procesando' | 'exitoso' | 'con_advertencias' | 'fallido'
+export type TipoCargaCliente = 'portafolio' | 'competidores'
+
+export interface PreviewError {
+  fila: number
+  columna?: string | null
+  mensaje: string
 }
 
-export interface CargaError {
-  fila: number
-  columna: string | null
-  mensaje: string
+export interface PreviewResult {
+  previewId: string
+  resumen: {
+    nuevas: number
+    actualizadas: number
+    omitidas: number
+  }
+  errores: PreviewError[]
 }
 
 export interface CargaHistorialRow {
   id: string
-  tipoArchivo: string
+  tipoArchivo: TipoCargaCliente
   nombreArchivo: string
-  estado: string
-  registrosProcesados: number
+  estado: EstadoCarga
+  filasNuevas: number
+  filasActualizadas: number
   totalErrores: number
   subidoPor: string | null
   fechaCarga: string

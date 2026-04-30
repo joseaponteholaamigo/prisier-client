@@ -75,7 +75,7 @@ export default function CompetenciaPage() {
 
       {/* Sub-tabs */}
       <div className="flex gap-4 border-b border-p-border mb-6">
-        {([['dashboard', 'Dashboard'], ['detalle', 'Detalle por SKU'], ['por-marca', 'Tu precio vs. competidor por marca']] as const).map(([key, label]) => (
+        {([['dashboard', 'Dashboard'], ['por-marca', 'Tu precio vs. competidor por marca'], ['detalle', 'Detalle por SKU']] as const).map(([key, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -209,7 +209,7 @@ function DashboardTab({ filters }: { filters: string }) {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold text-white">Comparación de precios por producto</h3>
               {totalProducts > SCATTER_TOP && (
-                <span className="text-xs text-p-muted">Mostrando los {SCATTER_TOP} productos con mayor diferencia respecto a la competencia</span>
+                <span className="text-xs text-p-muted">Mostrando los {SCATTER_TOP} productos con mayor diferencia (de {totalProducts} totales)</span>
               )}
             </div>
             <Plot
@@ -455,7 +455,7 @@ function DetalleTab({ filters }: { filters: string }) {
             {chipFiltered.length === 0 && (
               <tr>
                 <td colSpan={8} className="text-center py-12 text-p-muted">
-                  No hay competidores configurados para los productos filtrados
+                  No hay competidores configurados para los productos mostrados
                 </td>
               </tr>
             )}
@@ -673,9 +673,9 @@ function PorMarcaTab({ filters }: { filters: string }) {
               <th style={{ width: '18%' }}>Marca</th>
               <th style={{ width: '18%' }} className="text-right">Precio prom. tuyo</th>
               <th style={{ width: '18%' }} className="text-right">Precio prom. competidor</th>
-              <th style={{ width: '15%' }} className="text-right">Diferencial</th>
+              <th style={{ width: '15%' }} className="text-right">Variación</th>
               <th style={{ width: '12%' }} className="text-right">SKUs</th>
-              <th style={{ width: '19%' }} className="text-right" title="Diferencia de precio multiplicada por el número de productos de la marca. Indica el potencial de ajuste en términos monetarios.">Oportunidad estimada</th>
+              <th style={{ width: '19%' }} className="text-right" title="Diferencia de precio multiplicada por el número de productos propios de la marca. Indica el potencial de ajuste en términos monetarios.">Diferencia</th>
             </tr>
           </thead>
           <tbody>
@@ -749,11 +749,3 @@ function KpiCard({ label, value, icon: Icon, color, sub, subColor }: {
   )
 }
 
-function DiferencialBadge({ value }: { value: number }) {
-  const abs = Math.abs(value)
-  const cls = abs > 5 ? 'badge badge-red'
-    : abs > 3 ? 'badge badge-yellow'
-    : 'badge badge-green'
-
-  return <span className={cls}>{value > 0 ? '+' : ''}{value.toFixed(1)}%</span>
-}
